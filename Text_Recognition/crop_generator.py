@@ -4,37 +4,33 @@ import pandas as pd
 import cv2
 
 def bbox_concat(json_data):
+    
     result = []
     sorted_bboxes = sorted(json_data['Bbox'], key=lambda bbox: min(bbox['y']))
-
-    def process_text(text):
-        sorted_text = sorted(text, key=lambda x: x[1])
-        line = ' '.join(word[0] for word in sorted_text)
-        return line
-
-    def update_bounds(bounds, bbox):
-        bounds[0] = min(bounds[0], min(bbox['x']))
-        bounds[1] = max(bounds[1], max(bbox['x']))
-        bounds[2] = min(bounds[2], min(bbox['y']))
-        bounds[3] = max(bounds[3], max(bbox['y']))
-
-    init_bbox = sorted_bboxes[0]
-    text = [[init_bbox['data'], min(init_bbox['x'])]]
-    bounds = list(init_bbox['x']) + list(init_bbox['y'])
+    initBox = sorted_bboxes[0]
+    text = [[initBox['data'], min(initBox['x'])]]
+    minX, maxX, minY, maxY = min(initBox['x']), max(initBox['x']), min(initBox['y']), max(initBox['y'])
+    midLine = (minY + maxY) / 2
 
     for bbox in sorted_bboxes[1:]:
-        if min(bbox['y']) < (bounds[2] + bounds[3]) / 2 < max(bbox['y']):
-            update_bounds(bounds, bbox)
+        if min(bbox['y']) < midLine < max(bbox['y']):
+            minX = min(minX, min(bbox['x']))
+            maxX = max(maxX, max(bbox['x']))
+            minY = min(minY, min(bbox['y']))
+            maxY = max(maxY, max(bbox['y']))
             text.append([bbox['data'], min(bbox['x'])])
         else:
-            line = process_text(text)
-            result.append([line, bounds])
-            
-            bounds = list(bbox['x']) + list(bbox['y'])
-            text = [[bbox['data'], min(bbox['x'])]]
-
-    line = process_text(text)
-    result.append([line, bounds])
+            text = sorted(text, key=lambda x: x[1])
+            line = ' '.join(word[0] for word in text)
+            result.append([line,[minX, maxX, minY, maxY]])
+        
+            minX, maxX, minY, maxY = min(bbox['x']), max(bbox['x']), min(bbox['y']), max(bbox['y'])
+            midLine = (minY + maxY) / 2
+            text = [[bbox['data'],min(bbox['x'])]]
+        
+    text = sorted(text, key=lambda x: x[1])
+    line = ' '.join(word[0] for word in text)
+    result.append([line,[minX, maxX, minY, maxY]])
 
     return result
 
@@ -45,6 +41,11 @@ def pre_process(cropped_image):
                     cv2.THRESH_BINARY,13,4)
     cropped_image = cv2.fastNlMeansDenoising(cropped_image,None,10,3,10)
     return cropped_image
+
+def load_json_file(file_path):
+    with open(file_path, 'r', encoding='utf-8') as file:
+        data = json.load(file)
+    return data
 
 def crop_generate(root_dir):
     
@@ -60,12 +61,10 @@ def crop_generate(root_dir):
 
     for i in range(n_iter):
 
-        image_path = os.path.join(label_dir,label_files[i])
-        label_path = os.path.join(image_dir,image_files[i])
-
-        with open(label_path, 'r', encoding='UTF-8') as f:
-            label = json.load(f)
+        label_path = os.path.join(label_dir,label_files[i])
+        image_path = os.path.join(image_dir,image_files[i])
         
+        label = load_json_file(label_path)
         image = cv2.imread(image_path, cv2.IMREAD_COLOR)
         image_name = label['Images']['identifier']
         
@@ -78,6 +77,7 @@ def crop_generate(root_dir):
             for item in bbox_sorted:
                 data = item[0]
                 bbox = item[1]
+                print([bbox[2],bbox[3],bbox[0],bbox[1]])
                 cropped_image = image[bbox[2]:bbox[3],bbox[0]:bbox[1]]
                 cropped_image = pre_process(cropped_image)
 
@@ -90,4 +90,4 @@ def crop_generate(root_dir):
             
     crop_labels.to_csv(crop_label_dir, index=False, encoding='utf-8')
 
-crop_generate('C:/Users/wjdgh/Desktop/HandChive/Text_Recognition')
+crop_generate('/root/HandChive/Text_Recognition')
