@@ -5,8 +5,12 @@ from PIL import Image
 import torch
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
+
+from tqdm.notebook import tqdm
+import torchvision.models as models
 from sklearn.model_selection import train_test_split
-from transformers import VisionEncoderDecoderModel, TrOCRProcessor, AutoTokenizer, DeiTImageProcessor
+from transformers import VisionEncoderDecoderModel, TrOCRProcessor, AutoTokenizer, DeiTImageProcessor, AdamW
+
 
 def load_processors():
     ## 이미지 프로세서와 토크나이저 사전 훈련 모델이 사용한 것과 똑같은 것 가져오기.
@@ -73,3 +77,44 @@ class HandWriting(Dataset):
         ## 변환한 이미지와 텍스트에 대한 인코딩을 딕셔너리에 저장. 모델 입력값으로 쓰일 예정.
         encoding = {"pixel_values": pixel_values.squeeze(), "labels": torch.tensor(labels)}
         return encoding
+    
+from transformers import AdamW
+from tqdm.notebook import tqdm
+import torchvision.models as models
+
+optimizer = AdamW(model.parameters(), lr=5e-5)
+
+for epoch in range(1):  # loop over the dataset multiple times
+   # train
+   model.train()
+   train_loss = 0.0
+   for batch in tqdm(train_dataloader):
+      # get the inputs
+      for k,v in batch.items():
+        batch[k] = v.to(device)
+
+      # forward + backward + optimize
+      outputs = model(**batch)
+      loss = outputs.loss
+      loss.backward()
+      optimizer.step()
+      optimizer.zero_grad()
+
+      train_loss += loss.item()
+
+   print(f"Loss after epoch {epoch}:", train_loss/len(train_dataloader))
+    
+   # evaluate
+   model.eval()
+   valid_cer = 0.0
+   with torch.no_grad():
+     for batch in tqdm(test_dataloader):
+       # run batch generation
+       outputs = model.generate(batch["pixel_values"].to(device))
+       # compute metrics
+       cer = compute_cer(pred_ids=outputs, label_ids=batch["labels"])
+       valid_cer += cer 
+
+   print("Validation CER:", valid_cer / len(test_dataloader))
+
+torch.save(model, '저장할 위치')
