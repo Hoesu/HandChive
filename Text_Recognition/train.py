@@ -6,11 +6,12 @@ from dataset import create_dataloader
 
 import os
 import torch
+import warnings
 from transformers import AdamW
 from datasets import load_metric
 from rich.progress import Progress
 
-def compute_cer(pred_ids, label_ids):
+def compute_cer(pred_ids, label_ids, processor):
     pred_str = processor.batch_decode(pred_ids, skip_special_tokens=True)
     label_ids[label_ids == -100] = processor.tokenizer.pad_token_id
     label_str = processor.batch_decode(label_ids, skip_special_tokens=True)
@@ -27,11 +28,10 @@ def train(model_path, train_path, num_epochs):
     print('dataloader created.')
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Current device: {device}")
-    model = None
-    if os.path.exists(model_path):
-        model = load_model(model_path)
-    else:
-        model = create_model(model_path,processor)
+    if os.path.exists(model_path) == False:
+        print("Model does not exist")
+        create_model(model_path,processor)
+    model = load_model(model_path)
     optimizer = AdamW(model.parameters(), lr=5e-5)
     print('optimizer setting complete.')
     
@@ -68,7 +68,7 @@ def train(model_path, train_path, num_epochs):
                     # Run batch generation
                     outputs = model.generate(batch["pixel_values"].to(device))
                     # Compute metrics
-                    cer = compute_cer(pred_ids=outputs, label_ids=batch["labels"])
+                    cer = compute_cer(pred_ids=outputs, label_ids=batch["labels"], processor=processor)
                     valid_cer += cer
                     progress.update(task, advance=1)
 
@@ -76,7 +76,8 @@ def train(model_path, train_path, num_epochs):
 
     # Save the trained model
     save_model(model, '/root/HandChive/Text_Recognition/model/trocr.pth')
-    
+
+warnings.filterwarnings("ignore")
 model_path = '/root/HandChive/Text_Recognition/model/trocr.pth'
 train_path = '/root/HandChive/Text_Recognition/data'
 

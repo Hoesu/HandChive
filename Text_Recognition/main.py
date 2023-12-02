@@ -1,5 +1,6 @@
 import os
 import torch
+import warnings
 import pandas as pd
 from PIL import Image
 from tqdm.notebook import tqdm
@@ -15,7 +16,7 @@ def load_processors():
     processor = TrOCRProcessor(image_processor = DEIT, tokenizer = ROBERTA)
     return processor
 
-def create_model(filepath, processor):
+def create_model(model_path, processor):
     model = VisionEncoderDecoderModel.from_pretrained("team-lucid/trocr-small-korean")
     # set special tokens used for creating the decoder_input_ids from the labels
     model.config.decoder_start_token_id = processor.tokenizer.cls_token_id
@@ -29,16 +30,16 @@ def create_model(filepath, processor):
     model.config.no_repeat_ngram_size = 3
     model.config.length_penalty = 2.0
     model.config.num_beams = 4
-    save_model(model, filepath)
-    print(f'Model created and saved to {filepath}')
+    print(f'Model created at {model_path}')
+    save_model(model, model_path)
 
-def save_model(model, filepath):
-    torch.save(model, filepath)
-    print(f'Model saved to {filepath}')
+def save_model(model, model_path):
+    torch.save(model, model_path)
+    print(f'Model saved to {model_path}')
 
-def load_model(filepath):
+def load_model(model_path):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = torch.load(filepath, map_location=device)
+    model = torch.load(model_path, map_location=device)
     model.to(device)
-    print(f'Model loaded from {filepath}')
+    print(f'Model loaded from {model_path}')
     return model

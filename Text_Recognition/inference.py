@@ -1,5 +1,6 @@
 import os
 import torch
+import warnings
 from PIL import Image
 from main import load_model
 from main import load_processors
@@ -21,13 +22,16 @@ def inference(input_dir, processor, model):
         generated_text += processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
     return generated_text
 
-
+warnings.filterwarnings("ignore")
 model_path = '/root/HandChive/Text_Recognition/model/trocr.pth'
 image_path = '/root/HandChive/Text_Recognition/data/crop_image'
 
 if os.path.exists(model_path):
+    print('loading existing model from the designated path...')
     model = load_model(model_path)
+    print('loading processors...')
     processor = load_processors()
+    print('conducting inference...')
     result = inference(image_path,processor,model)
     print(result)
 else:
